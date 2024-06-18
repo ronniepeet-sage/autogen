@@ -1,32 +1,53 @@
-#-------------------------------------------------------------------------------------------------------------
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See LICENSE file in the project root for license information.
-#-------------------------------------------------------------------------------------------------------------
-
-FROM mcr.microsoft.com/vscode/devcontainers/python:3.10
-
-#
-# Update the OS and maybe install packages
-#
-ENV DEBIAN_FRONTEND=noninteractive
+# Basic setup
+FROM python:3.11-slim-bookworm
 
 # add git lhs to apt
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
 
-RUN apt-get update \
-   && apt-get upgrade -y  \
-   && apt-get -y install --no-install-recommends build-essential npm git-lfs \
-   && apt-get autoremove -y \
-   && apt-get clean -y \
-   && arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) \
-   && wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.5.23/quarto-1.5.23-linux-${arch}.deb \
-   && dpkg -i quarto-1.5.23-linux-${arch}.deb \
-   && rm -rf /var/lib/apt/lists/* quarto-1.5.23-linux-${arch}.deb
-ENV DEBIAN_FRONTEND=dialog
+# Update and install necessary packages
+RUN apt-get update && apt-get -y update
+# added vim and nano for convenience
+RUN apt-get install -y sudo git npm vim nano curl wget git-lfs
 
-# For docs
-RUN npm install --global yarn
+# Setup a non-root user 'autogen' with sudo access
+RUN adduser --disabled-password --gecos '' autogen
+RUN adduser autogen sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER autogen
+WORKDIR /home/autogen
+
+# Set environment variable
+# ENV OPENAI_API_KEY="{OpenAI-API-Key}"
+
+# Clone the AutoGen repository from your GitHub
+RUN git clone https://github.com/ronniepeet-sage/autogen.git /home/autogen/autogen
+WORKDIR /home/autogen/autogen
+
+# Install AutoGen in editable mode with extra components
+RUN sudo pip install -e .[test,teachable,lmm,retrievechat,mathchat,blendsearch]
+
+# Install pre-commit hooks
+RUN pre-commit install
+
+# Setup Docusaurus and Yarn for the documentation website
+RUN sudo npm install --global yarn
+RUN sudo pip install pydoc-markdown
+RUN cd website && yarn install --frozen-lockfile --ignore-engines
+
+RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
+    wget -q https://github.com/quarto-dev/quarto-cli/releases/download/v1.5.23/quarto-1.5.23-linux-${arch}.tar.gz && \
+    mkdir -p /home/autogen/quarto/ && \
+    tar -xzf quarto-1.5.23-linux-${arch}.tar.gz --directory /home/autogen/quarto/ && \
+    rm quarto-1.5.23-linux-${arch}.tar.gz
+
+ENV PATH="${PATH}:/home/autogen/quarto/quarto-1.5.23/bin/"
+
+# Expose the Yarn port for Docusaurus
+EXPOSE 3000
+
+# Pre-load popular Python packages
 RUN pip install --upgrade pip
-RUN pip install pydoc-markdown
-RUN pip install pyyaml
-RUN pip install colored
+RUN pip install numpy pandas matplotlib seaborn scikit-learn requests urllib3 nltk pillow pytest beautifulsoup4
+
+# Set the default command to bash
+CMD ["/bin/bash"]

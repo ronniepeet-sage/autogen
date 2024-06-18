@@ -1,12 +1,12 @@
 # Basic setup
 FROM python:3.11-slim-bookworm
 
-# add git lhs to apt
+# Add git-lfs to apt
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
 
 # Update and install necessary packages
 RUN apt-get update && apt-get -y update
-# added vim and nano for convenience
+# Added vim and nano for convenience
 RUN apt-get install -y sudo git npm vim nano curl wget git-lfs
 
 # Setup a non-root user 'autogen' with sudo access
@@ -19,8 +19,8 @@ WORKDIR /home/autogen
 # Set environment variable
 # ENV OPENAI_API_KEY="{OpenAI-API-Key}"
 
-# Clone the AutoGen repository
-RUN git clone https://github.com/microsoft/autogen.git /home/autogen/autogen
+# Clone your AutoGen repository
+RUN git clone https://github.com/ronniepeet-sage/autogen.git /home/autogen/autogen
 WORKDIR /home/autogen/autogen
 
 # Install AutoGen in editable mode with extra components
@@ -32,8 +32,7 @@ RUN pre-commit install
 # Setup Docusaurus and Yarn for the documentation website
 RUN sudo npm install --global yarn
 RUN sudo pip install pydoc-markdown
-RUN cd website
-RUN yarn install --frozen-lockfile --ignore-engines
+RUN cd website && yarn install --frozen-lockfile --ignore-engines
 
 RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
     wget -q https://github.com/quarto-dev/quarto-cli/releases/download/v1.5.23/quarto-1.5.23-linux-${arch}.tar.gz && \
@@ -43,7 +42,7 @@ RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
 
 ENV PATH="${PATH}:/home/autogen/quarto/quarto-1.5.23/bin/"
 
-# Exposes the Yarn port for Docusaurus
+# Expose the Yarn port for Docusaurus
 EXPOSE 3000
 
 # Pre-load popular Python packages
